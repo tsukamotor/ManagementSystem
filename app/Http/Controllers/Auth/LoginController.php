@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use App\Providers\RouteServiceProvider;
 use Illuminate\Foundation\Auth\AuthenticatesUsers;
+use Illuminate\Http\Request;//追記
 
 class LoginController extends Controller
 {
@@ -19,7 +20,17 @@ class LoginController extends Controller
     |
     */
 
-    use AuthenticatesUsers;
+    //use AuthenticatesUsers;
+    //ログアウトしたらログイン画面に遷移する↓
+    use AuthenticatesUsers{
+        logout as doLogout;
+      }
+  
+      public function logout(Request $request){
+        $this->doLogout($request);
+        return redirect('/home');
+      }
+      //↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑↑
 
     /**
      * Where to redirect users after login.
