@@ -16,10 +16,7 @@ class Company extends Model
     ];
 
     public function getList() {
-        // companiesテーブルからデータを取得
-        //$companies = DB::table('companies')->get();
         $companies = Company::all();
-
         return $companies;
     }
 

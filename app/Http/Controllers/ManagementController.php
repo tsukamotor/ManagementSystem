@@ -13,61 +13,40 @@ class ManagementController extends Controller
 {
     //削除
     public function destroy($id){
-        // productsテーブルから指定のIDのレコード1件を取得
-        $product = Product::find($id);
-        // レコードを削除
+        $products = new Product();
+        $product = $products->getId($id);
+        
         $product->delete();
-        // 削除したらhome画面にリダイレクト
         return redirect()->route('home')->with('flash_message', 'ID：'.$id.'の商品を一覧から削除しました');
     }
 
     //詳細画面
     public function showInformation($id){
-        $product = Product::find($id);
+        $products = new Product();
+        $product = $products->getId($id);
+
         return view('information', ['product' => $product,]);
     }
 
     //新規登録画面
     public function showAdd(Request $request, Product $product){
-        $company_list = Company::all();
+        $companies = new Company();
+        $company_list = $companies->getList();
+
         return view('add', compact('product','company_list'));
     }
 
     //新規登録処理
     public function update(ManagementRequest $request, Product $product ,Company $company){
-        $company_list = Company::all();
-        $query = Company::all();
-
         // トランザクション開始
         DB::beginTransaction();
 
         try {// 登録処理
-            // //companiesテーブルをメーカー名で検索。
-            // if (DB::table('companies')->where('company_name', $request->company_id)->exists()){
-            //     //カラムに存在していれば何もしない
-            // } else {
-            //     //カラムに存在していなければ、companiesテーブルに新規登録
-            //     $company->company_name = $request->company_id;
-            //     $company->save();
-            // }
-
-            //companiesテーブルからIDを検索
-            $query = Company::whereCompany_name($request->company_id)->first();
-
-            //productテーブルにメーカーIDを代入
-            $product->company_id = $query->id;
-
-            $product->product_name = $request->product_name;
-            $product->price = $request->price;
-            $product->stock = $request->stock;
-            $product->comment = $request->comment;
-            $path = $request->file('img_path')->store('public/images');
-            $product->img_path = basename($path);
-            $product->save();
+            $products = new Product();
+            $query = $products->productId($request, $product);
 
             // トランザクション開始してからここまでのDB操作を適用
             DB::commit();
-                
             return redirect()->route('add')->with('flash_message', '商品を新規登録しました');
     
         } catch (\Exception $e) {
@@ -79,54 +58,37 @@ class ManagementController extends Controller
 
     //編集画面
     public function showEdit($id) {
-        $product = Product::find($id);
-        $company_list = Company::all();
+        $products = new Product();
+        $product = $products->getId($id);
+
+        $companies = new Company();
+        $company_list = $companies->getList();
+
         return view('edit', ['product' => $product ,'company_list' => $company_list]);
     }
 
     //編集処理
     public function editUpdate($id, ManagementRequest $request, Product $product ,Company $company){
-        $company_list = Company::all();
-        $query = Company::all();
+        $companies = new Company();
+        $company_list = $companies->getList();
+
+        $products = new Product();
+        $product = $products->getId($id);
 
         // トランザクション開始
         DB::beginTransaction();
     
         try {// 登録処理
-            // //companiesテーブルをメーカー名で検索。
-            // if (DB::table('companies')->where('company_name', $request->company_id)->exists()){
-            // } else {
-            //     //companiesテーブルに新規登録
-            //     $company->company_name = $request->company_id;
-            //     $company->save();
-            // }
-
-            //companiesテーブルからIDを検索
-            $query = Company::whereCompany_name($request->company_id)->first();
-
-            $product = Product::find($id);
-            
-            //productテーブルにメーカー名を代入
-            $product->company_id = $query->id;
-
-            $product->product_name = $request->product_name;
-            $product->price = $request->price;
-            $product->stock = $request->stock;
-            $product->comment = $request->comment;
-            $path = $request->file('img_path')->store('public/images');
-            $product->img_path = basename($path);
-            $product->save();
+            $query = $products->productId($request, $product);
 
             // トランザクション開始してからここまでのDB操作を適用
             DB::commit();
-            
             return view('edit', compact('product', 'company_list'))->with('flash_message', '商品情報を更新しました');
 
         } catch (\Exception $e) {
             // トランザクション開始してからここまでのDB操作を無かったことにする
             DB::rollback();
             return back();
-            //return redirect(route('edit'));
         }
     }
 
@@ -146,32 +108,19 @@ class ManagementController extends Controller
 
     //home画面
     public function showHome(Request $request){
-
-        //検索フォームに入力された値を取得
         $keyword = $request->input('keyword');
         $drpCompany = $request->input('drpCompany');
 
-        $query = Product::query();
+        $product = new Product();
+        $query = $product->getQuery();
 
-        //テーブル結合
-        $query = DB::table('products')  // 主となるテーブル名
-            //productsテーブルのカラムを下記のようにする（companiesテーブルのidをcompany_idにカラム名変更。）
-            ->select('products.id', 'products.product_name', 'products.price', 'products.stock', 'products.comment', 'products.img_path', 'products.created_at', 'products.updated_at', 'companies.id as company_id', 'companies.company_name')
-             // 第一引数に結合するテーブル名、第二引数に主テーブルの結合キー、第四引数に結合するテーブルの結合キーを記述
-            ->join('companies', 'products.company_id', '=', 'companies.id');
-
-        if(!empty($drpCompany)) {
-            $query->where('company_name', 'LIKE', $drpCompany);
-        }
-
-        if(!empty($keyword)) {
-            $query->where('product_name', 'LIKE', "%{$keyword}%");
-        }
+        $query = $product->getSearch($query, $keyword, $drpCompany);
 
         $products = $query->get();
-        $companies = Company::all();
+
+        $company_list = new Company();
+        $companies = $company_list->getList();
        
-        //dd($products);
         return view('home', compact('products', 'keyword','companies'));
     }
 
